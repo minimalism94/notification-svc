@@ -13,8 +13,6 @@ public class PreferenceRequest {
     private UUID userId;
 
     private boolean notificationEnabled;
-
-
     private String contactInfo;
     private NotificationType type;
 }

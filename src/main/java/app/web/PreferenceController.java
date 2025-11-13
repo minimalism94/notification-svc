@@ -8,6 +8,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/preferences")
 public class PreferenceController {
@@ -26,5 +28,12 @@ public class PreferenceController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(DtoMapper.from(preference));
+    }
+    @GetMapping
+    public ResponseEntity<PreferenceResponse> getPreference(@RequestParam ("userId") UUID userId) {
+
+        NotificationPreference userNotification = notificationPreferenceService.getByUserId(userId);
+
+        return ResponseEntity.ok(DtoMapper.from(userNotification));
     }
 }
