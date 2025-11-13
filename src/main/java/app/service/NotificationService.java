@@ -22,13 +22,16 @@ public class NotificationService {
     private final NotificationRepository notificationRepository;
     private final NotificationPreferenceService preferenceService;
     private  final MailSender mailSender;
-    private final SmsNotificationService smsNotificationService;
+    private final SmsProvider smsProvider;
 
-    public NotificationService(NotificationRepository notificationRepository, NotificationPreferenceService preferenceService, MailSender mailSender, SmsNotificationService smsNotificationService) {
+    public NotificationService(NotificationRepository notificationRepository, 
+                              NotificationPreferenceService preferenceService, 
+                              MailSender mailSender, 
+                              SmsProvider smsProvider) {
         this.notificationRepository = notificationRepository;
         this.preferenceService = preferenceService;
         this.mailSender = mailSender;
-        this.smsNotificationService = smsNotificationService;
+        this.smsProvider = smsProvider;
     }
 
     public Notification send(NotificationRequest request) {
@@ -39,6 +42,9 @@ public class NotificationService {
         if (!enabled) {
             throw new IllegalStateException("User with id=[%s] turned off their notifications.".formatted(request.getUserId()));
         }
+
+        log.info("[Notification] Sending notification - UserId: {}, Type: {}, ContactInfo: {}, Subject: {}", 
+                request.getUserId(), preference.getType(), preference.getContactInfo(), request.getSubject());
 
         Notification notification = Notification.builder()
                 .subject(request.getSubject())
@@ -57,14 +63,27 @@ public class NotificationService {
 
         try {
             if (preference.getType() == NotificationType.EMAIL) {
+                log.info("[Notification] Sending EMAIL to: {}", preference.getContactInfo());
                 mailSender.send(mailMessage);
+                log.info("[Notification] EMAIL sent successfully");
+                notification.setStatus(NotificationStatus.SUCCEEDED);
 
             } else if (preference.getType() == NotificationType.SMS) {
-                smsNotificationService.sendSms(preference.getContactInfo(), request.getBody());
+                log.info("[Notification] Sending SMS/WhatsApp to: {}", preference.getContactInfo());
+                boolean smsSent = smsProvider.sendSms(preference.getContactInfo(), request.getBody());
+                if (smsSent) {
+                    log.info("[Notification] SMS/WhatsApp sent and delivered successfully");
+                    notification.setStatus(NotificationStatus.SUCCEEDED);
+                } else {
+                    log.error("[Notification] SMS/WhatsApp failed to deliver - marking as FAILED");
+                    notification.setStatus(NotificationStatus.FAILED);
+                }
+            } else {
+                log.warn("[Notification] Unknown notification type: {}", preference.getType());
+                notification.setStatus(NotificationStatus.FAILED);
             }
-            notification.setStatus(NotificationStatus.SUCCEEDED);
         } catch (Exception e) {
-            log.error("Failed email due to: {}", e.getMessage());
+            log.error("[Notification] Failed to send {} notification due to: {}", preference.getType(), e.getMessage(), e);
             notification.setStatus(NotificationStatus.FAILED);
         }
 

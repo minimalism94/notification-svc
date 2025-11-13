@@ -26,14 +26,25 @@ public class NotificationPreferenceService {
             NotificationPreference preference = preferenceOpt.get();
             preference.setEnabled(request.isNotificationEnabled());
             preference.setContactInfo(request.getContactInfo());
+            
+
+            if (request.getType() != null) {
+                preference.setType(request.getType());
+            } else {
+                NotificationType detectedType = detectTypeFromContactInfo(request.getContactInfo());
+                preference.setType(detectedType);
+            }
+            
             preference.setUpdatedOn(LocalDateTime.now());
             return preferenceRepository.save(preference);
         }
+        
+
         NotificationType type;
-        if (request.getContactInfo().contains("@")) {
-            type = NotificationType.EMAIL;
+        if (request.getType() != null) {
+            type = request.getType();
         } else {
-            type = NotificationType.SMS;
+            type = detectTypeFromContactInfo(request.getContactInfo());
         }
 
         NotificationPreference preference = NotificationPreference.builder()
@@ -46,6 +57,17 @@ public class NotificationPreferenceService {
                 .build();
 
         return preferenceRepository.save(preference);
+    }
+    
+    private NotificationType detectTypeFromContactInfo(String contactInfo) {
+        if (contactInfo == null || contactInfo.trim().isEmpty()) {
+            return NotificationType.EMAIL;
+        }
+        if (contactInfo.contains("@")) {
+            return NotificationType.EMAIL;
+        } else {
+            return NotificationType.SMS;
+        }
     }
 
     public NotificationPreference getByUserId(UUID userId) {
